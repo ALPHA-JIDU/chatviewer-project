@@ -1,0 +1,58 @@
+
+name: Extract ZIP into repository
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "*.zip"
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract uploaded ZIP
+        run: |
+          set -e
+          mkdir extracted
+
+          zipfile=$(find . -maxdepth 1 -name '*.zip' -print -quit)
+          if [ -z "$zipfile" ]; then
+            echo "No ZIP file found"
+            exit 1
+          fi
+
+          unzip -q "$zipfile" -d extracted
+
+          shopt -s dotglob nullglob
+          entries=(extracted/*)
+
+          if [ "${#entries[@]}" -eq 1 ] &&
+             [ -d "${entries[0]}" ]; then
+            cp -a "${entries[0]}"/. .
+          else
+            cp -a extracted/. .
+          fi
+
+          rm -rf extracted
+          rm -f "$zipfile"
+
+      - name: Commit extracted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Extract uploaded project ZIP"
+            git push
+          fi
